@@ -36,7 +36,6 @@
         }
         h2, h3 { text-align: center; color: #fff; margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #a0b2ce; font-size: 13px; }
         input[type="file"], input[type="number"], input[type="text"] {
             width: 100%; padding: 11px; border-radius: 6px; border: 1px solid var(--border-color);
@@ -196,7 +195,28 @@ function toggleLevelInput() {
     input.style.display = (type === 'manual') ? 'block' : 'none';
 }
 
-// --- 1. كود كميات الحفر والردم والكنتور ---
+// دالة التحميل الآمنة لمنع فتح الملف كنص
+function safeDownloadDXF(dxfContent, filename) {
+    let blob = new Blob([dxfContent], { type: "application/dxf;charset=utf-8" });
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, filename);
+    } else {
+        let link = document.createElement("a");
+        if (link.download !== undefined) {
+            let url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            saveAs(blob, filename);
+        }
+    }
+}
+
+// 1. كميات الحفر والردم والكنتور
 function parseSDRorCSV(text) {
     let parsed = [];
     let lines = text.split('\n');
@@ -272,7 +292,7 @@ function calculateQuantitiesAndDXF() {
     document.getElementById('fillVolume').innerText = `إجمالي كمية الردم (Fill): ${totalFill.toFixed(2)} م³`;
     document.getElementById('quantResults').style.display = 'block';
 
-    let dxf = ["0\nSECTION\n2\nENTITIES"];
+    let dxf = ["0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES"];
     for (let p of points) {
         dxf.push(`0\nPOINT\n8\nNGL_POINTS\n10\n${p.e}\n20\n${p.n}\n30\n${p.z}`);
         dxf.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
@@ -295,10 +315,10 @@ function calculateQuantitiesAndDXF() {
 
 function downloadQuantDXF() {
     if (!generatedQuantDXF) return;
-    saveAs(new Blob([generatedQuantDXF], { type: "text/plain;charset=utf-8" }), "Survey_Contour_Quantities.dxf");
+    safeDownloadDXF(generatedQuantDXF, "Survey_Contour_Quantities.dxf");
 }
 
-// --- 2. كود إدراج المناسيب تلقائياً كل 1 متر على لوحات الكاد ---
+// 2. إدراج المناسيب تلقائياً كل 1 متر
 function generateLevelsOnDXF() {
     let fileInput = document.getElementById('dxfFileInput');
     let layer = document.getElementById('targetLayer').value || "ELEVATIONS_EVERY_1M";
@@ -312,7 +332,6 @@ function generateLevelsOnDXF() {
         if (insertPos === -1) { alert("ملف DXF غير صالح!"); return; }
 
         let newEntities = [];
-        // قراءة الخطوط والمسارات الممثلة في اللوحة
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim() === "LINE") {
                 let x1=0, y1=0, z1=0, x2=0, y2=0, z2=0;
@@ -340,7 +359,6 @@ function generateLevelsOnDXF() {
         }
 
         if (newEntities.length === 0) {
-            // إضافة مناسيب افتراضية للوحة في حال عدم وجود خطوط
             for (let k = 0; k <= 10; k++) {
                 newEntities.push(`0\nPOINT\n8\n${layer}\n10\n${k}\n20\n${k}\n30\n${100+k}`);
                 newEntities.push(`0\nTEXT\n8\n${layer}\n10\n${k+0.1}\n20\n${k+0.1}\n30\n${100+k}\n40\n0.25\n1\nZ:${(100+k).toFixed(2)}`);
@@ -348,12 +366,12 @@ function generateLevelsOnDXF() {
         }
 
         let updatedContent = content.slice(0, insertPos) + newEntities.join("\n") + "\n" + content.slice(insertPos);
-        saveAs(new Blob([updatedContent], { type: "text/plain;charset=utf-8" }), "Drawing_With_1M_Levels.dxf");
+        safeDownloadDXF(updatedContent, "Drawing_With_1M_Levels.dxf");
     };
     reader.readAsText(fileInput.files[0]);
 }
 
-// --- 3. كود حساب الطريق ---
+// 3. حساب الطريق
 function calculateRoad() {
     let hi = parseFloat(document.getElementById('roadHI').value);
     let len = parseInt(document.getElementById('roadLength').value);
@@ -383,7 +401,7 @@ function calculateRoad() {
     document.getElementById('roadResults').style.display = 'block';
 }
 
-// --- 4. كود حساب المواسير ---
+// 4. حساب المواسير
 function calculatePipe() {
     let hi = parseFloat(document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
@@ -402,10 +420,11 @@ function calculatePipe() {
         let crownZ = invZ + dia;
         let crownRead = isNaN(hi) ? "-" : (hi - crownZ).toFixed(3);
 
-        let tr = document.createElement('tr');
-        if (m % 5 === 0) tr.className = "highlight-5m";
-        tr.innerHTML = `<td>${m} م</td><td>${invZ.toFixed(3)}</td><td>${crownZ.toFixed(3)}</td><td>${crownRead}</td>`;
-        tbody.appendChild(tr);
+        let tr = document.getElementById('pipeTable').querySelector('tbody');
+        let trItem = document.createElement('tr');
+        if (m % 5 === 0) trItem.className = "highlight-5m";
+        trItem.innerHTML = `<td>${m} م</td><td>${invZ.toFixed(3)}</td><td>${crownZ.toFixed(3)}</td><td>${crownRead}</td>`;
+        tbody.appendChild(trItem);
     }
     document.getElementById('pipeResults').style.display = 'block';
 }
