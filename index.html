@@ -199,7 +199,7 @@ function buildCleanDXF(entitiesContent) {
 }
 
 function safeDownloadFile(content, filename) {
-    let blob = new Blob([content], { type: 'application/acad;charset=utf-8' });
+    let blob = new Blob([content], { type: 'application/octet-stream;charset=utf-8' });
     let link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
     link.download = filename;
@@ -413,7 +413,7 @@ function calculateRoad() {
 }
 
 function calculatePipe() {
-    let hi = parseFloat(document.getElementById('pipeHI').>value || document.getElementById('pipeHI').value);
+    let hi = parseFloat(document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
     let startInv = parseFloat(document.getElementById('pipeStartInv').value);
     let endInv = parseFloat(document.getElementById('pipeEndInv').value);
