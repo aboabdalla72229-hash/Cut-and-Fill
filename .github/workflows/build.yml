@@ -19,21 +19,27 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    - name: Setup Gradle 6.8.3
+    - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
-        gradle-version: '6.8.3'
+        gradle-version: '7.5'
 
-    - name: Extract ZIP File
+    - name: Unzip Project Files
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
-    - name: Build APK
+    - name: Generate Clean Gradle Wrapper & Build APK
       run: |
-        BUILD_FILE=$(find app_src -name "build.gradle" | head -n 1)
-        PROJECT_DIR=$(dirname "$BUILD_FILE")
-        cd "$PROJECT_DIR"
-        gradle assembleDebug -x test --warning-mode none
+        # Locate project root directory
+        PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
+        cd "$PROJ_DIR"
+        
+        # Regenerate gradlew to replace broken file
+        gradle wrapper --gradle-version 7.5
+        chmod +x gradlew
+        
+        # Build Debug APK suppressing legacy property errors
+        ./gradlew assembleDebug -Pandroid.defaults.buildfeatures.buildconfig=true --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
