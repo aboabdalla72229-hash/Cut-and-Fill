@@ -18,16 +18,16 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Unzip Project Files
+    - name: Unzip Project File
       run: |
-        mkdir -p extracted
-        unzip -o "*.zip" -d extracted/
-        find extracted -name "gradlew" -exec chmod +x {} \;
+        python3 -c "import zipfile, glob; zip_file = glob.glob('*.zip')[0]; zipfile.ZipFile(zip_file).extractall('extracted_app')"
+        find extracted_app -name "gradlew" -exec chmod +x {} \;
 
     - name: Build APK with Gradle
       run: |
-        GRADLE_DIR=$(dirname $(find extracted -name "gradlew" | head -n 1))
-        cd "$GRADLE_DIR"
+        GRADLE_PATH=$(find extracted_app -name "gradlew" | head -n 1)
+        PROJECT_DIR=$(dirname "$GRADLE_PATH")
+        cd "$PROJECT_DIR"
         ./gradlew assembleDebug
 
     - name: Upload APK Artifact
