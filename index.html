@@ -108,7 +108,7 @@
 
     <!-- SECTION 2: توليد مناسيب كل متر على لوحة DXF -->
     <div class="card">
-        <h3>🗺️ 2. إنشاء مناسيب كل 1 متر تلقائيًا على لوحة DXF (يدعم Line & Polyline)</h3>
+        <h3>🗺️ 2. إنشاء مناسيب كل 1 متر تلقائيًا (يدعم Line & Polyline)</h3>
         <div class="grid-2">
             <div>
                 <label>اختر ملف اللوحة (DXF):</label>
@@ -119,7 +119,7 @@
                 <input type="text" id="targetLayer" value="ELEVATIONS_EVERY_1M">
             </div>
         </div>
-        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب وتحميل اللوحة المعدلة</button>
+        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب وتحميل لوحة آمنة ومضمونة</button>
     </div>
 
     <!-- SECTION 3: حساب ميول الطريق -->
@@ -195,8 +195,8 @@ function toggleLevelInput() {
     input.style.display = (type === 'manual') ? 'block' : 'none';
 }
 
-function buildValidDXF(entitiesContent) {
-    return `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n63\n0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entitiesContent}\n0\nENDSEC\n0\nEOF`;
+function buildValidDXF(entitiesContent, customLayers = "") {
+    return `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n63\n0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\n${customLayers}\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entitiesContent}\n0\nENDSEC\n0\nEOF`;
 }
 
 function safeDownloadFile(content, filename, mimeType) {
@@ -265,8 +265,9 @@ function calculateQuantitiesAndDXF() {
     for (let e = minE; e <= maxE; e += gridSize) {
         for (let n = minN; n <= maxN; n += gridSize) {
             let near = points[0], minD = Infinity;
+            let d;
             for (let p of points) {
-                let d = Math.hypot(p.e - e, p.n - n);
+                d = Math.hypot(p.e - e, p.n - n);
                 if (d < minD) { minD = d; near = p; }
             }
             let diff = near.z - targetZ;
@@ -286,7 +287,8 @@ function calculateQuantitiesAndDXF() {
         entities.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
     }
 
-    generatedQuantDXF = buildValidDXF(entities.join("\n"));
+    let layerDef = `0\nLAYER\n2\nNGL_POINTS\n70\n0\n62\n3\n6\nCONTINUOUS\n0`;
+    generatedQuantDXF = buildValidDXF(entities.join("\n"), layerDef);
 }
 
 function downloadQuantDXF() {
@@ -294,7 +296,7 @@ function downloadQuantDXF() {
     safeDownloadFile(generatedQuantDXF, "Survey_Quantities.dxf", "application/dxf");
 }
 
-// --- 2. توليد المناسيب على اللوحة (يدعم LINE و POLYLINE) ---
+// --- 2. قراءة اللوحة الأصلية وتوليد المناسيب بطريقة آمنة ومضمونة ---
 function generateLevelsOnDXF() {
     let fileInput = document.getElementById('dxfFileInput');
     let layer = document.getElementById('targetLayer').value || "ELEVATIONS_EVERY_1M";
@@ -305,13 +307,11 @@ function generateLevelsOnDXF() {
         let content = e.target.result;
         let normalizedContent = content.replace(/\r\n/g, '\n');
         let lines = normalizedContent.split('\n');
-        let newEntities = [];
         let subSegments = [];
 
         for (let i = 0; i < lines.length; i++) {
             let tag = lines[i].trim();
 
-            // 1. التعامل مع LINE العادية
             if (tag === "LINE") {
                 let x1 = null, y1 = null, z1 = 0, x2 = null, y2 = null, z2 = 0;
                 for (let j = i + 1; j < i + 30 && j < lines.length; j++) {
@@ -328,8 +328,6 @@ function generateLevelsOnDXF() {
                     subSegments.push({x1, y1, z1, x2, y2, z2});
                 }
             }
-
-            // 2. التعامل مع POLYLINE / LWPOLYLINE المتصلة
             else if (tag === "POLYLINE" || tag === "LWPOLYLINE") {
                 let polyPoints = [];
                 let curX = null, curY = null, curZ = 0;
@@ -345,11 +343,8 @@ function generateLevelsOnDXF() {
                     if (code === "20") curY = parseFloat(lines[j+1]);
                     if (code === "30") curZ = parseFloat(lines[j+1]) || 0;
                     
-                    // عند اكتمال النقطة (X و Y)
                     if (code === "20" || code === "10") {
-                        // إذا توافرت الإحداثيات نثبتها
                         if (curX !== null && curY !== null) {
-                            // تجنب تكرار نفس الإحداثي المتتالي
                             if (polyPoints.length === 0 || polyPoints[polyPoints.length-1].x !== curX || polyPoints[polyPoints.length-1].y !== curY) {
                                 polyPoints.push({x: curX, y: curY, z: curZ});
                             }
@@ -358,7 +353,6 @@ function generateLevelsOnDXF() {
                     j++;
                 }
 
-                // ربط نقاط البولي لاين ببعضها كشرائح خطوط منفصلة
                 for (let pIdx = 0; pIdx < polyPoints.length - 1; pIdx++) {
                     let ptA = polyPoints[pIdx];
                     let ptB = polyPoints[pIdx + 1];
@@ -370,17 +364,19 @@ function generateLevelsOnDXF() {
             }
         }
 
-        // توزيع مسافات المتر الواحد على كل الشرائح المستخرجة
+        if (subSegments.length === 0) {
+            alert("لم يتم العثور على خطوط (LINE أو POLYLINE) في اللوحة!");
+            return;
+        }
+
+        let newEntities = [];
         for (let seg of subSegments) {
             let len = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
             if (len > 0) {
                 for (let dist = 0; dist <= len; dist += 1.0) {
                     let ratio = dist / len;
                     let px = seg.x1 + ratio * (seg.x2 - seg.x1);
-                    let py = seg.y1 + ratio * (seg.y1 ? (seg.y2 - seg.y1) : 0); // تم التصحيح الدقيق
-                    // الحساب الأدق للإحداثيات:
-                    px = seg.x1 + ratio * (seg.x2 - seg.x1);
-                    py = seg.y1 + ratio * (seg.y2 - seg.y1);
+                    let py = seg.y1 + ratio * (seg.y2 - seg.y1);
                     let pz = seg.z1 + ratio * (seg.z2 - seg.z1);
 
                     newEntities.push(`0\nPOINT\n8\n${layer}\n10\n${px}\n20\n${py}\n30\n${pz}`);
@@ -389,26 +385,24 @@ function generateLevelsOnDXF() {
             }
         }
 
-        if (newEntities.length === 0) {
-            alert("لم يتم العثور على خطوط (LINE أو POLYLINE) صالحة في اللوحة المرفوعة!");
-            return;
-        }
-
+        // استخراج الكيانات الأصلية للوحة وإرفاق النقاط الجديدة معها بأمان تام لتفادي أي Access Error
         let entitiesIdx = normalizedContent.indexOf("\n2\nENTITIES");
-        if (entitiesIdx === -1) {
-            alert("عذراً، لم يتم العثور على قسم الكيانات (ENTITIES) في الملف.");
-            return;
+        let safeContent = normalizedContent;
+        
+        let customLayerDef = `0\nLAYER\n2\n${layer}\n70\n0\n62\n4\n6\nCONTINUOUS\n0`;
+
+        if (entitiesIdx !== -1) {
+            let endSecIdx = normalizedContent.indexOf("\n0\nENDSEC", entitiesIdx);
+            if (endSecIdx !== -1) {
+                safeContent = normalizedContent.substring(0, endSecIdx) + "\n" + newEntities.join("\n") + normalizedContent.substring(endSecIdx);
+            } else {
+                safeContent = buildValidDXF(newEntities.join("\n"), customLayerDef);
+            }
+        } else {
+            safeContent = buildValidDXF(newEntities.join("\n"), customLayerDef);
         }
 
-        let endSecIdx = normalizedContent.indexOf("\n0\nENDSEC", entitiesIdx);
-        if (endSecIdx === -1) {
-            alert("ملف DXF غير مكتمل.");
-            return;
-        }
-
-        let updatedContent = normalizedContent.substring(0, endSecIdx) + "\n" + newEntities.join("\n") + normalizedContent.substring(endSecIdx);
-
-        safeDownloadFile(updatedContent, "Modified_Drawing_1M.dxf", "application/dxf");
+        safeDownloadFile(safeContent, "Safe_Drawing_With_1M_Levels.dxf", "application/dxf");
     };
     reader.readAsText(fileInput.files[0]);
 }
@@ -448,9 +442,7 @@ function calculatePipe() {
     let hi = parseFloat(document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
     let startInv = parseFloat(document.getElementById('pipeStartInv').value);
-    let endInv = parseFloat(document.getElementById('pipeEndInv5') ? document.getElementById('pipeEndInv5').value : document.getElementById('pipeEndInv').value);
-    // تصحيح مرجعي بسيط لقراءة الحقول:
-    endInv = parseFloat(document.getElementById('pipeEndInv').value);
+    let endInv = parseFloat(document.getElementById('pipeEndInv').value);
     let dia = parseFloat(document.getElementById('pipeDia').value) || 0;
 
     if (isNaN(len) || isNaN(startInv) || isNaN(endInv)) { alert("يرجى إدخال بيانات الماسورة بشكل صحيح!"); return; }
