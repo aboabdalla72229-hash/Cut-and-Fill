@@ -3,46 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SurveyQuant - حسابات الكميات والمساحة</title>
+    <title>SurveyQuant - برنامج الحسابات والكنتور الـ DXF</title>
+    <!-- مكتبة dxf-writer لتوليد ملفات DXF مباشرة من المتصفح -->
+    <script src="https://unpkg.com/dxf-writer@1.15.3/dist/dxf-writer.min.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; background: #12181f; color: #e0e6ed; padding: 20px; direction: rtl; text-align: right; }
-        .container { max-width: 500px; margin: 0 auto; background: #1a232e; padding: 20px; border-radius: 12px; border: 1px solid #2a364f; }
-        h2 { color: #0088ff; text-align: center; margin-top: 0; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2a364f; background: #0f141c; color: #fff; box-sizing: border-box; }
-        button { width: 100%; background: #0088ff; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .result { margin-top: 15px; padding: 12px; border-radius: 6px; background: #0d1117; border: 1px dashed #0088ff; display: none; text-align: center; font-size: 18px; }
+        :root {
+            --bg-dark: #121820;
+            --card-bg: #1e2736;
+            --accent-blue: #0088ff;
+            --accent-green: #2ecc71;
+            --border-color: #2c3b52;
+            --text-main: #e0e8f5;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            direction: rtl;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        h2 { text-align: center; color: #fff; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        .section { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #a0b2ce; }
+        input[type="file"], input[type="number"], select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
+            background: #0f141d; color: #fff; box-sizing: border-box; font-size: 14px; margin-bottom: 10px;
+        }
+        .radio-group { display: flex; gap: 15px; margin-bottom: 15px; }
+        .radio-group label { font-weight: normal; cursor: pointer; }
+        button {
+            width: 100%; background: var(--accent-blue); color: #fff; border: none; padding: 14px;
+            border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { background: #0066cc; }
+        .results-box {
+            display: none; background: #0f141d; border: 1px dashed var(--accent-blue);
+            padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;
+        }
+        .btn-download {
+            background: var(--accent-green); margin-top: 10px; display: inline-block;
+            text-decoration: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; color: white;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📐 حاسبة Cut / Fill</h2>
-    <div class="form-group">
-        <label>منسوب الأرض الطبيعية (NGL):</label>
-        <input type="number" id="ngl" step="0.001" placeholder="مثال: 100.50">
+    <h2>📐 SurveyQuant: تحليل النقاط والكنتور وكميات القطع والردم</h2>
+
+    <!-- 1. رفع الملف -->
+    <div class="section">
+        <label>1. اختر ملف النقاط المساحية (SDR, CSV, TXT, DAT):</label>
+        <input type="file" id="fileInput" accept=".sdr,.csv,.txt,.dat">
     </div>
-    <div class="form-group">
-        <label>منسوب التصميم (Design Level):</label>
-        <input type="number" id="design" step="0.001" placeholder="مثال: 99.20">
+
+    <!-- 2. تحديد منسوب التصميم -->
+    <div class="section">
+        <label>2. طريقة تحديد منسوب المقارنة / التصميم:</label>
+        <div class="radio-group">
+            <label><input type="radio" name="levelType" value="manual" checked onclick="toggleLevelInput()"> منسوب محدد يدوي</label>
+            <label><input type="radio" name="levelType" value="min" onclick="toggleLevelInput()"> أقل منسوب بالملف</label>
+            <label><input type="radio" name="levelType" value="avg" onclick="toggleLevelInput()"> متوسط المناسيب</label>
+        </div>
+        <input type="number" id="targetLevel" step="0.001" placeholder="أدخل المنسوب المطلوب (مثال: 105.50)">
     </div>
-    <button onclick="calc()">حساب الفرق</button>
-    <div id="res" class="result"></div>
+
+    <!-- 3. المباعدة الكنتورية -->
+    <div class="section">
+        <label>3. الفترة الكنتورية (Contour Interval) بالمتر:</label>
+        <input type="number" id="contourInterval" step="0.1" value="1.0">
+    </div>
+
+    <button onclick="processSurveyData()">معالجة البيانات وحساب الكميات وتوليد الـ DXF</button>
+
+    <!-- النتائج -->
+    <div id="results" class="results-box">
+        <h3>نتائج الحسابات:</h3>
+        <p id="levelInfo"></p>
+        <p id="cutVolume" style="color: #ff4d4d; font-size: 18px; font-weight: bold;"></p>
+        <p id="fillVolume" style="color: #2ecc71; font-size: 18px; font-weight: bold;"></p>
+        <a id="downloadBtn" class="btn-download" href="#" download="Survey_Contour_Quantities.dxf">💾 تحميل لوحة DXF للاوتوكاد</a>
+    </div>
 </div>
 
 <script>
-    function calc() {
-        let n = parseFloat(document.getElementById('ngl').value);
-        let d = parseFloat(document.getElementById('design').value);
-        let r = document.getElementById('res');
-        if (isNaN(n) || isNaN(d)) { alert("أدخل المناسيب صحيحة"); return; }
-        let diff = n - d;
-        r.style.display = 'block';
-        if (diff > 0) r.innerHTML = "عمق الحفر (Cut): <strong style='color:#ff4d4d'>" + diff.toFixed(3) + " م</strong>";
-        else if (diff < 0) r.innerHTML = "ارتفاع الردم (Fill): <strong style='color:#2ecc71'>" + Math.abs(diff).toFixed(3) + " م</strong>";
-        else r.innerHTML = "<strong style='color:#f1c40f'>المنسوب مطابق (Zero)</strong>";
+let points = [];
+
+function toggleLevelInput() {
+    const type = document.querySelector('input[name="levelType"]:checked').value;
+    const input = document.getElementById('targetLevel');
+    input.style.display = (type === 'manual') ? 'block' : 'none';
+}
+
+function parseSDRorCSV(text) {
+    let parsedPoints = [];
+    let lines = text.split('\n');
+    
+    for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+
+        // قراءة صيغة SDR33 / SDR20 (تكون البيانات مقسمة بـ 08TP أو تحتوي على أعمدة ثابتة)
+        if (line.startsWith('08TP') || line.startsWith('08KI')) {
+            let pName = line.substring(4, 20).trim();
+            let n = parseFloat(line.substring(20, 36));
+            let e = parseFloat(line.substring(36, 52));
+            let z = parseFloat(line.substring(52, 68));
+            if (!isNaN(n) && !isNaN(e) && !isNaN(z)) {
+                parsedPoints.push({ id: pName, e: e, n: n, z: z });
+            }
+        } else {
+            // قراءة صيغ CSV / TXT (Pt,E,N,Z أو Pt,N,E,Z)
+            let parts = line.split(/[, \t]+/);
+            if (parts.length >= 4) {
+                let p1 = parseFloat(parts[1]), p2 = parseFloat(parts[2]), p3 = parseFloat(parts[3]);
+                if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
+                    parsedPoints.push({ id: parts[0], e: p1, n: p2, z: p3 });
+                }
+            }
+        }
     }
+    return parsedPoints;
+}
+
+function processSurveyData() {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files[0]) {
+        alert("يرجى اختيار ملف نقاط أولاً!");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        points = parseSDRorCSV(e.target.result);
+        if (points.length === 0) {
+            alert("لم يتم العثور على نقاط صالحة في الملف. يرجى التأكد من الصيغة.");
+            return;
+        }
+
+        calculateAndGenerateDXF();
+    };
+    reader.readAsText(fileInput.files[0]);
+}
+
+function calculateAndGenerateDXF() {
+    let zValues = points.map(p => p.z);
+    let minZ = Math.min(...zValues);
+    let maxZ = Math.max(...zValues);
+    let avgZ = zValues.reduce((a, b) => a + b, 0) / zValues.length;
+
+    let levelType = document.querySelector('input[name="levelType"]:checked').value;
+    let targetZ = minZ;
+    if (levelType === 'manual') {
+        targetZ = parseFloat(document.getElementById('targetLevel').value) || avgZ;
+    } else if (levelType === 'avg') {
+        targetZ = avgZ;
+    }
+
+    // حساب كميات الحفر والردم الحجمية (طريقة الشبكة Grid Volume Method)
+    let minE = Math.min(...points.map(p => p.e));
+    let maxE = Math.max(...points.map(p => p.e));
+    let minN = Math.min(...points.map(p => p.n));
+    let maxN = Math.max(...points.map(p => p.n));
+
+    let gridSize = 1.0; // شبكة بدقة 1 متر
+    let totalCut = 0, totalFill = 0;
+
+    for (let e = minE; e <= maxE; e += gridSize) {
+        for (let n = minN; n <= maxN; n += gridSize) {
+            // أقرب نقطة لحساب المنسوب التقريبي للخلية
+            let near = points[0], minD = Infinity;
+            for (let p of points) {
+                let d = Math.hypot(p.e - e, p.n - n);
+                if (d < minD) { minD = d; near = p; }
+            }
+            let diff = near.z - targetZ;
+            if (diff > 0) totalCut += diff * (gridSize * gridSize);
+            else totalFill += Math.abs(diff) * (gridSize * gridSize);
+        }
+    }
+
+    // عرض النتائج على الشاشة
+    document.getElementById('levelInfo').innerText = `منسوب المقارنة المستخدم: ${targetZ.toFixed(3)} م`;
+    document.getElementById('cutVolume').innerText = `إجمالي كمية الحفر (Cut): ${totalCut.toFixed(2)} م³`;
+    document.getElementById('fillVolume').innerText = `إجمالي كمية الردم (Fill): ${totalFill.toFixed(2)} م³`;
+    document.getElementById('results').style.display = 'block';
+
+    // إنشاء ملف DXF
+    const Drawing = window.DxfWriter;
+    const d = new Drawing();
+
+    // إنشاء الطبقات (Layers)
+    d.addLayer('NGL_POINTS', Drawing.ACI.CYAN, 'CONTINUOUS');
+    d.addLayer('DESIGN_SURFACE', Drawing.ACI.RED, 'CONTINUOUS');
+    d.addLayer('CONTOUR_LINES', Drawing.ACI.GREEN, 'CONTINUOUS');
+    d.addLayer('QUANTITIES_TABLE', Drawing.ACI.WHITE, 'CONTINUOUS');
+
+    // 1. رسم النقاط على الأوتوكاد (3D Points)
+    for (let p of points) {
+        d.drawPoint(p.e, p.n, p.z, 'NGL_POINTS');
+        d.drawText(p.e + 0.2, p.n + 0.2, 0.3, 0, `Z:${p.z.toFixed(2)}`, 'NGL_POINTS');
+    }
+
+    // 2. رسم خطوط الكنتور (Contour Lines)
+    let interval = parseFloat(document.getElementById('contourInterval').value) || 1.0;
+    for (let cZ = Math.floor(minZ); cZ <= Math.ceil(maxZ); cZ += interval) {
+        for (let i = 0; i < points.length - 1; i++) {
+            let p1 = points[i], p2 = points[i+1];
+            if ((p1.z <= cZ && p2.z >= cZ) || (p1.z >= cZ && p2.z <= cZ)) {
+                let ratio = (cZ - p1.z) / (p2.z - p1.z || 1);
+                let cE = p1.e + ratio * (p2.e - p1.e);
+                let cN = p1.n + ratio * (p2.n - p1.n);
+                d.drawPoint(cE, cN, cZ, 'CONTOUR_LINES');
+            }
+        }
+    }
+
+    // 3. رسم جدول الكميات والتفاصيل في اللوحة
+    let tX = maxE + 5, tY = maxN;
+    d.drawText(tX, tY, 1.0, 0, "--- SURVEYQUANT SUMMARY TABLE ---", 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 2, 0.7, 0, `Total Points: ${points.length}`, 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 4, 0.7, 0, `Min Elevation: ${minZ.toFixed(3)} m`, 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 6, 0.7, 0, `Max Elevation: ${maxZ.toFixed(3)} m`, 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 8, 0.7, 0, `Design Level: ${targetZ.toFixed(3)} m`, 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 10, 0.8, 0, `CUT VOLUME: ${totalCut.toFixed(2)} m3`, 'QUANTITIES_TABLE');
+    d.drawText(tX, tY - 12, 0.8, 0, `FILL VOLUME: ${totalFill.toFixed(2)} m3`, 'QUANTITIES_TABLE');
+
+    // رابط تحميل ملف DXF
+    const dxfString = d.toDxfString();
+    const blob = new Blob([dxfString], { type: 'application/dxf' });
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.href = URL.createObjectURL(blob);
+}
 </script>
 
 </body>
