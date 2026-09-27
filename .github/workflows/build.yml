@@ -18,19 +18,19 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Unzip project
+    - name: Extract ZIP
       run: |
-        unzip SurveyQuant_AIDE_*.zip -d extracted_project
-        cd extracted_project
-        chmod +x gradlew || true
+        sudo apt-get install -y unzip
+        unzip *.zip -d project_files
 
-    - name: Build APK with Gradle
+    - name: Build APK
       run: |
-        cd extracted_project
+        cd project_files
+        chmod +x gradlew || true
         ./gradlew assembleDebug
 
-    - name: Upload APK
+    - name: Upload APK Artifact
       uses: actions/upload-artifact@v3
       with:
         name: SurveyQuant-App
-        path: extracted_project/app/build/outputs/apk/debug/app-debug.apk
+        path: project_files/app/build/outputs/apk/debug/app-debug.apk
