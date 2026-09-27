@@ -13,33 +13,34 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up JDK 11
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
-        java-version: '11'
+        java-version: '17'
         distribution: 'temurin'
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '7.5'
 
-    - name: Unzip Project Files
+    - name: Extract ZIP and Fix Gradle Project
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
+        
+        # Locate the build.gradle file inside app directory
+        APP_GRADLE=$(find app_src -path "*/app/build.gradle" | head -n 1)
+        
+        # Automatically inject namespace if missing
+        if ! grep -q "namespace" "$APP_GRADLE"; then
+          sed -i '/android {/a \    namespace "com.surveyquant.app"' "$APP_GRADLE"
+        fi
 
-    - name: Generate Clean Gradle Wrapper & Build APK
+    - name: Build Debug APK
       run: |
-        # Locate project root directory
         PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
         cd "$PROJ_DIR"
-        
-        # Regenerate gradlew to replace broken file
         gradle wrapper --gradle-version 7.5
         chmod +x gradlew
-        
-        # Build Debug APK suppressing legacy property errors
-        ./gradlew assembleDebug -Pandroid.defaults.buildfeatures.buildconfig=true --no-daemon
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
