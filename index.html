@@ -102,7 +102,7 @@
             <p id="levelInfo" style="font-weight: bold; font-size: 15px;"></p>
             <p id="cutVolume" style="color: var(--accent-red); font-size: 18px; font-weight: bold;"></p>
             <p id="fillVolume" style="color: var(--accent-green); font-size: 18px; font-weight: bold;"></p>
-            <button type="button" class="btn-green" onclick="downloadQuantDXF()">💾 تحميل لوحة DXF للاوتوكاد</button>
+            <button type="button" class="btn-green" onclick="downloadQuantDXF()">💾 تحميل لوحة DXF متوافقة</button>
         </div>
     </div>
 
@@ -119,7 +119,7 @@
                 <input type="text" id="targetLayer" value="ELEVATIONS_EVERY_1M">
             </div>
         </div>
-        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب كل 1 متر وتحميل اللوحة</button>
+        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب وتحميل لوحة DXF المعتمدة</button>
     </div>
 
     <!-- SECTION 3: حساب ميول الطريق -->
@@ -195,28 +195,78 @@ function toggleLevelInput() {
     input.style.display = (type === 'manual') ? 'block' : 'none';
 }
 
-// دالة التحميل الآمنة لمنع فتح الملف كنص
-function safeDownloadDXF(dxfContent, filename) {
-    let blob = new Blob([dxfContent], { type: "application/dxf;charset=utf-8" });
-    if (navigator.msSaveBlob) {
-        navigator.msSaveBlob(blob, filename);
-    } else {
-        let link = document.createElement("a");
-        if (link.download !== undefined) {
-            let url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } else {
-            saveAs(blob, filename);
-        }
-    }
+function buildValidDXF(entitiesContent) {
+    return `0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1015
+0
+ENDSEC
+0
+SECTION
+2
+TABLES
+0
+TABLE
+2
+LTYPE
+70
+1
+0
+LTYPE
+2
+CONTINUOUS
+70
+0
+3
+Solid line
+72
+65
+63
+0
+0
+ENDTAB
+0
+TABLE
+2
+LAYER
+70
+1
+0
+LAYER
+2
+0
+70
+0
+62
+7
+6
+CONTINUOUS
+0
+ENDTAB
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+${entitiesContent}
+0
+ENDSEC
+0
+EOF`;
 }
 
-// 1. كميات الحفر والردم والكنتور
+function safeDownloadFile(content, filename, mimeType) {
+    let blob = new Blob([content], { type: mimeType });
+    saveAs(blob, filename);
+}
+
+// --- 1. حساب الكميات والكنتور ---
 function parseSDRorCSV(text) {
     let parsed = [];
     let lines = text.split('\n');
@@ -292,14 +342,14 @@ function calculateQuantitiesAndDXF() {
     document.getElementById('fillVolume').innerText = `إجمالي كمية الردم (Fill): ${totalFill.toFixed(2)} م³`;
     document.getElementById('quantResults').style.display = 'block';
 
-    let dxf = ["0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES"];
+    let entities = [];
     for (let p of points) {
-        dxf.push(`0\nPOINT\n8\nNGL_POINTS\n10\n${p.e}\n20\n${p.n}\n30\n${p.z}`);
-        dxf.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
+        entities.push(`0\nPOINT\n8\nNGL_POINTS\n10\n${p.e}\n20\n${p.n}\n30\n${p.z}`);
+        entities.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
     }
 
     let tX = maxE + 5, tY = maxN;
-    let addText = (x, y, txt, size=0.7) => dxf.push(`0\nTEXT\n8\nQUANTITIES_TABLE\n10\n${x}\n20\n${y}\n30\n0\n40\n${size}\n1\n${txt}`);
+    let addText = (x, y, txt, size=0.7) => entities.push(`0\nTEXT\n8\nQUANTITIES_TABLE\n10\n${x}\n20\n${y}\n30\n0\n40\n${size}\n1\n${txt}`);
     addText(tX, tY, "--- SURVEYQUANT SUMMARY TABLE ---", 1.0);
     addText(tX, tY - 2, `Total Points: ${points.length}`);
     addText(tX, tY - 4, `Max Level (Pt ${maxPt.id}): ${maxPt.z.toFixed(3)} m`);
@@ -309,16 +359,15 @@ function calculateQuantitiesAndDXF() {
     addText(tX, tY - offset - 2, `CUT VOLUME: ${totalCut.toFixed(2)} m3`, 0.8);
     addText(tX, tY - offset - 4, `FILL VOLUME: ${totalFill.toFixed(2)} m3`, 0.8);
 
-    dxf.push("0\nENDSEC\n0\nEOF");
-    generatedQuantDXF = dxf.join("\n");
+    generatedQuantDXF = buildValidDXF(entities.join("\n"));
 }
 
 function downloadQuantDXF() {
     if (!generatedQuantDXF) return;
-    safeDownloadDXF(generatedQuantDXF, "Survey_Contour_Quantities.dxf");
+    safeDownloadFile(generatedQuantDXF, "Survey_Contour_Quantities.dxf", "application/dxf");
 }
 
-// 2. إدراج المناسيب تلقائياً كل 1 متر
+// --- 2. توليد المناسيب على اللوحة ---
 function generateLevelsOnDXF() {
     let fileInput = document.getElementById('dxfFileInput');
     let layer = document.getElementById('targetLayer').value || "ELEVATIONS_EVERY_1M";
@@ -328,10 +377,8 @@ function generateLevelsOnDXF() {
     reader.onload = function(e) {
         let content = e.target.result;
         let lines = content.split('\n');
-        let insertPos = content.indexOf("ENDSEC");
-        if (insertPos === -1) { alert("ملف DXF غير صالح!"); return; }
-
         let newEntities = [];
+
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim() === "LINE") {
                 let x1=0, y1=0, z1=0, x2=0, y2=0, z2=0;
@@ -365,13 +412,13 @@ function generateLevelsOnDXF() {
             }
         }
 
-        let updatedContent = content.slice(0, insertPos) + newEntities.join("\n") + "\n" + content.slice(insertPos);
-        safeDownloadDXF(updatedContent, "Drawing_With_1M_Levels.dxf");
+        let fullDXF = buildValidDXF(newEntities.join("\n"));
+        safeDownloadFile(fullDXF, "Drawing_With_1M_Levels.dxf", "application/dxf");
     };
     reader.readAsText(fileInput.files[0]);
 }
 
-// 3. حساب الطريق
+// --- 3. حساب الطريق ---
 function calculateRoad() {
     let hi = parseFloat(document.getElementById('roadHI').value);
     let len = parseInt(document.getElementById('roadLength').value);
@@ -401,7 +448,7 @@ function calculateRoad() {
     document.getElementById('roadResults').style.display = 'block';
 }
 
-// 4. حساب المواسير
+// --- 4. حساب المواسير ---
 function calculatePipe() {
     let hi = parseFloat(document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
@@ -420,11 +467,10 @@ function calculatePipe() {
         let crownZ = invZ + dia;
         let crownRead = isNaN(hi) ? "-" : (hi - crownZ).toFixed(3);
 
-        let tr = document.getElementById('pipeTable').querySelector('tbody');
-        let trItem = document.createElement('tr');
-        if (m % 5 === 0) trItem.className = "highlight-5m";
-        trItem.innerHTML = `<td>${m} م</td><td>${invZ.toFixed(3)}</td><td>${crownZ.toFixed(3)}</td><td>${crownRead}</td>`;
-        tbody.appendChild(trItem);
+        let tr = document.createElement('tr');
+        if (m % 5 === 0) tr.className = "highlight-5m";
+        tr.innerHTML = `<td>${m} م</td><td>${invZ.toFixed(3)}</td><td>${crownZ.toFixed(3)}</td><td>${crownRead}</td>`;
+        tbody.appendChild(tr);
     }
     document.getElementById('pipeResults').style.display = 'block';
 }
