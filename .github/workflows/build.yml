@@ -19,20 +19,25 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
     - name: Extract ZIP File
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
-    - name: Build APK using Android Command Line Tools
+    - name: Fix App build.gradle
+      run: |
+        APP_GRADLE=$(find app_src -name "build.gradle" | grep "app" | head -n 1)
+        sed -i 's/android {/android {\n    namespace "com.surveyquant.app"/' "$APP_GRADLE"
+
+    - name: Build APK with Gradle Wrapper
       run: |
         PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
         cd "$PROJ_DIR"
-        
-        # Inject namespace safely into build.gradle
-        sed -i '/android {/a \    namespace "com.surveyquant.app"' app/build.gradle
-        
-        # Build Debug APK
-        gradle assembleDebug --no-daemon
+        gradle wrapper --gradle-version 7.5
+        chmod +x gradlew
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
