@@ -3,18 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق المساحة والكميات</title>
+    <title>SurveyQuant - حسابات الكميات والمساحة</title>
     <style>
-        body { font-family: system-ui, sans-serif; background: #121212; color: #fff; text-align: center; padding: 40px 20px; }
-        .btn { background: #007bff; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-top: 20px; font-size: 18px; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; max-width: 400px; margin: 0 auto; }
+        body { font-family: system-ui, sans-serif; background: #12181f; color: #e0e6ed; padding: 20px; direction: rtl; text-align: right; }
+        .container { max-width: 500px; margin: 0 auto; background: #1a232e; padding: 20px; border-radius: 12px; border: 1px solid #2a364f; }
+        h2 { color: #0088ff; text-align: center; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2a364f; background: #0f141c; color: #fff; box-sizing: border-box; }
+        button { width: 100%; background: #0088ff; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .result { margin-top: 15px; padding: 12px; border-radius: 6px; background: #0d1117; border: 1px dashed #0088ff; display: none; text-align: center; font-size: 18px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>تطبيق SurveyQuant</h2>
-        <p>اضغط على الزر أدناه لتشغيل أدوات حسابات المساحة والكميات مباشرة عبر المتصفح:</p>
-        <a href="./SurveyQuant_AIDE_SDR_v2.1_FIX_gradlew.zip" class="btn">تحميل / فتح الملف</a>
+
+<div class="container">
+    <h2>📐 حاسبة Cut / Fill</h2>
+    <div class="form-group">
+        <label>منسوب الأرض الطبيعية (NGL):</label>
+        <input type="number" id="ngl" step="0.001" placeholder="مثال: 100.50">
     </div>
+    <div class="form-group">
+        <label>منسوب التصميم (Design Level):</label>
+        <input type="number" id="design" step="0.001" placeholder="مثال: 99.20">
+    </div>
+    <button onclick="calc()">حساب الفرق</button>
+    <div id="res" class="result"></div>
+</div>
+
+<script>
+    function calc() {
+        let n = parseFloat(document.getElementById('ngl').value);
+        let d = parseFloat(document.getElementById('design').value);
+        let r = document.getElementById('res');
+        if (isNaN(n) || isNaN(d)) { alert("أدخل المناسيب صحيحة"); return; }
+        let diff = n - d;
+        r.style.display = 'block';
+        if (diff > 0) r.innerHTML = "عمق الحفر (Cut): <strong style='color:#ff4d4d'>" + diff.toFixed(3) + " م</strong>";
+        else if (diff < 0) r.innerHTML = "ارتفاع الردم (Fill): <strong style='color:#2ecc71'>" + Math.abs(diff).toFixed(3) + " م</strong>";
+        else r.innerHTML = "<strong style='color:#f1c40f'>المنسوب مطابق (Zero)</strong>";
+    }
+</script>
+
 </body>
 </html>
