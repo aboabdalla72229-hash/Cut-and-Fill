@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SurveyQuant Suite - المنظومة المساحية المتكاملة</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         :root {
             --bg-dark: #121820;
@@ -195,18 +194,20 @@ function toggleLevelInput() {
     input.style.display = (type === 'manual') ? 'block' : 'none';
 }
 
-// هيكل DXF أساسي ونظيف جداً متوافق مع كافة إصدارات الأوتوكاد والموبايل
 function buildCleanDXF(entitiesContent) {
     return `  0\nSECTION\n  2\nHEADER\n  0\nENDSEC\n  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLTYPE\n  70\n  1\n  0\nLTYPE\n  2\nCONTINUOUS\n  70\n  0\n  3\nSolid line\n  72\n  65\n  3\n  0\nENDTAB\n  0\nTABLE\n  2\nLAYER\n  70\n  1\n  0\nLAYER\n  2\n0\n  70\n  0\n  62\n  7\n  6\nCONTINUOUS\n  0\nLAYER\n  2\nSURVEY_DATA\n  70\n  0\n  62\n  3\n  6\nCONTINUOUS\n  0\nENDTAB\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n${entitiesContent}\n  0\nENDSEC\n  0\nEOF\n`;
 }
 
-// استخدام ترميز نصي أنقى وأضمن لمنع أخطاء الحفظ على الجوال
 function safeDownloadFile(content, filename) {
-    let blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    saveAs(blob, filename);
+    let blob = new Blob([content], { type: 'application/acad;charset=utf-8' });
+    let link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
-// --- 1. حساب الكميات والكنتور ---
 function parseSDRorCSV(text) {
     let parsed = [];
     let lines = text.split('\n');
@@ -297,7 +298,6 @@ function downloadQuantDXF() {
     safeDownloadFile(generatedQuantDXF, "Survey_Points_Clean.dxf");
 }
 
-// --- 2. توليد المناسيب من اللوحة الأصلية ---
 function generateLevelsOnDXF() {
     let fileInput = document.getElementById('dxfFileInput');
     let layer = document.getElementById('targetLayer').value || "ELEVATIONS_1M";
@@ -383,7 +383,6 @@ function generateLevelsOnDXF() {
     reader.readAsText(fileInput.files[0]);
 }
 
-// --- 3. حساب الطريق ---
 function calculateRoad() {
     let hi = parseFloat(document.getElementById('roadHI').value);
     let len = parseInt(document.getElementById('roadLength').value);
@@ -413,13 +412,12 @@ function calculateRoad() {
     document.getElementById('roadResults').style.display = 'block';
 }
 
-// --- 4. حساب المواسير ---
 function calculatePipe() {
-    let hi = parseFloat(document.getElementById('pipeHI').value);
+    let hi = parseFloat(document.getElementById('pipeHI').>value || document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
     let startInv = parseFloat(document.getElementById('pipeStartInv').value);
     let endInv = parseFloat(document.getElementById('pipeEndInv').value);
-    let dia = parseFloat(document.getElementById('pipeDia.value')) || 0;
+    let dia = parseFloat(document.getElementById('pipeDia').value) || 0;
 
     if (isNaN(len) || isNaN(startInv) || isNaN(endInv)) { alert("يرجى إدخال بيانات الماسورة بشكل صحيح!"); return; }
 
