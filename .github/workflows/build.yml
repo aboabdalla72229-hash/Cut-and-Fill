@@ -13,18 +13,16 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up JDK 8
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
-        java-version: '8'
+        java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle 6.5
+    - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '6.5'
 
-    - name: Unzip Project
+    - name: Extract ZIP
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
@@ -32,7 +30,9 @@ jobs:
       run: |
         PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
         cd "$PROJ_DIR"
-        gradle assembleDebug --no-daemon
+        gradle wrapper --gradle-version 7.5
+        chmod +x gradlew
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
