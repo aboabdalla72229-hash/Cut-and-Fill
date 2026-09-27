@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SurveyQuant - برنامج الحسابات والكنتور الـ DXF</title>
-    <script src="https://unpkg.com/dxf-writer@1.15.3/dist/dxf-writer.min.js"></script>
     <style>
         :root {
             --bg-dark: #121820;
@@ -35,7 +34,7 @@
         h2 { text-align: center; color: #fff; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
         .section { margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 8px; color: #a0b2ce; }
-        input[type="file"], input[type="number"], select {
+        input[type="file"], input[type="number"] {
             width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
             background: #0f141d; color: #fff; box-sizing: border-box; font-size: 14px; margin-bottom: 10px;
         }
@@ -53,7 +52,8 @@
         .info-list { background: #1a232e; padding: 10px 15px; border-radius: 6px; margin: 10px 0; font-size: 14px; }
         .btn-download {
             background: var(--accent-green); margin-top: 15px; display: block; text-align: center;
-            text-decoration: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; color: white;
+            text-decoration: none; padding: 14px 20px; border-radius: 6px; font-weight: bold; color: white;
+            font-size: 16px; cursor: pointer;
         }
     </style>
 </head>
@@ -62,13 +62,11 @@
 <div class="container">
     <h2>📐 SurveyQuant: تحليل المناسيب والكنتور والكميات</h2>
 
-    <!-- 1. رفع الملف -->
     <div class="section">
         <label>1. اختر ملف النقاط المساحية (SDR, CSV, TXT, DAT):</label>
         <input type="file" id="fileInput" accept=".sdr,.csv,.txt,.dat">
     </div>
 
-    <!-- 2. تحديد منسوب التصميم / المقارنة -->
     <div class="section">
         <label>2. طريقة تحديد منسوب المقارنة / التصميم:</label>
         <div class="radio-grid">
@@ -80,15 +78,13 @@
         <input type="number" id="targetLevel" step="0.001" placeholder="أدخل المنسوب المطلوب يدويًا (مثال: 105.50)">
     </div>
 
-    <!-- 3. المباعدة الكنتورية -->
     <div class="section">
         <label>3. الفترة الكنتورية (Contour Interval) بالمتر:</label>
         <input type="number" id="contourInterval" step="0.1" value="1.0">
     </div>
 
-    <button onclick="processSurveyData()">معالجة البيانات وحساب الكميات وتوليد الـ DXF</button>
+    <button type="button" onclick="processSurveyData(event)">معالجة البيانات وحساب الكميات وتوليد الـ DXF</button>
 
-    <!-- النتائج -->
     <div id="results" class="results-box">
         <h3 style="color: var(--accent-blue); text-align: center;">نتائج المعالجة والحسابات</h3>
         
@@ -102,12 +98,13 @@
         <p id="cutVolume" style="color: var(--accent-red); font-size: 18px; font-weight: bold;"></p>
         <p id="fillVolume" style="color: var(--accent-green); font-size: 18px; font-weight: bold;"></p>
         
-        <a id="downloadBtn" class="btn-download" href="#" download="Survey_Contour_Quantities.dxf">💾 تحميل لوحة DXF للاوتوكاد</a>
+        <button type="button" id="downloadBtn" class="btn-download" onclick="downloadDXFFile()">💾 تحميل لوحة DXF للاوتوكاد</button>
     </div>
 </div>
 
 <script>
 let points = [];
+let generatedDXFString = "";
 
 function toggleLevelInput() {
     const type = document.querySelector('input[name="levelType"]:checked').value;
@@ -144,7 +141,8 @@ function parseSDRorCSV(text) {
     return parsedPoints;
 }
 
-function processSurveyData() {
+function processSurveyData(e) {
+    if(e) e.preventDefault();
     const fileInput = document.getElementById('fileInput');
     if (!fileInput.files[0]) {
         alert("يرجى اختيار ملف نقاط أولاً!");
@@ -152,8 +150,8 @@ function processSurveyData() {
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
-        points = parseSDRorCSV(e.target.result);
+    reader.onload = function(evt) {
+        points = parseSDRorCSV(evt.target.result);
         if (points.length === 0) {
             alert("لم يتم العثور على نقاط صالحة في الملف. يرجى التأكد من الصيغة.");
             return;
@@ -165,7 +163,6 @@ function processSurveyData() {
 }
 
 function calculateAndGenerateDXF() {
-    // ترتيب النقاط حسب المنسوب تصاعدياً
     let sortedPoints = [...points].sort((a, b) => a.z - b.z);
     
     let min3 = sortedPoints.slice(0, 3);
@@ -176,23 +173,21 @@ function calculateAndGenerateDXF() {
     let maxZ = maxPt.z;
     let avgZ = zValues.reduce((a, b) => a + b, 0) / zValues.length;
 
-    // تحديد منسوب التصميم حسب الاختيار
     let levelType = document.querySelector('input[name="levelType"]:checked').value;
     let targetZ = maxZ;
     if (levelType === 'min') targetZ = minZ;
     else if (levelType === 'avg') targetZ = avgZ;
     else if (levelType === 'manual') targetZ = parseFloat(document.getElementById('targetLevel').value) || avgZ;
 
-    // عرض أعلى منسوب وأقل 3 مناسيب
     document.getElementById('maxLevelText').innerText = `${maxPt.z.toFixed(3)} م (نقطة: ${maxPt.id})`;
     
     let minListHTML = "";
-    min3.forEach((p, idx) => {
+    min3.forEach((p) => {
         minListHTML += `<li>نقطة (${p.id}): <strong>${p.z.toFixed(3)} م</strong></li>`;
     });
     document.getElementById('minLevelsList').innerHTML = minListHTML;
 
-    // حساب كميات الحفر والردم الحجمية (Grid Volume Method)
+    // حساب كميات الحفر والردم
     let minE = Math.min(...points.map(p => p.e));
     let maxE = Math.max(...points.map(p => p.e));
     let minN = Math.min(...points.map(p => p.n));
@@ -219,53 +214,53 @@ function calculateAndGenerateDXF() {
     document.getElementById('fillVolume').innerText = `إجمالي كمية الردم (Fill): ${totalFill.toFixed(2)} م³`;
     document.getElementById('results').style.display = 'block';
 
-    // إنشاء ملف DXF للاوتوكاد
-    const Drawing = window.DxfWriter;
-    const d = new Drawing();
+    // بناء ملف DXF كـ String مباشر وبدون مكتبات خارجية
+    let dxf = [];
+    dxf.push("0\nSECTION\n2\nENTITIES");
 
-    d.addLayer('NGL_POINTS', Drawing.ACI.CYAN, 'CONTINUOUS');
-    d.addLayer('CONTOUR_LINES', Drawing.ACI.GREEN, 'CONTINUOUS');
-    d.addLayer('QUANTITIES_TABLE', Drawing.ACI.WHITE, 'CONTINUOUS');
-
-    // 1. رسم النقاط
+    // رسم النقاط والنصوص
     for (let p of points) {
-        d.drawPoint(p.e, p.n, p.z, 'NGL_POINTS');
-        d.drawText(p.e + 0.2, p.n + 0.2, 0.3, 0, `Z:${p.z.toFixed(2)}`, 'NGL_POINTS');
+        // Point
+        dxf.push(`0\nPOINT\n8\nNGL_POINTS\n10\n${p.e}\n20\n${p.n}\n30\n${p.z}`);
+        // Text
+        dxf.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
     }
 
-    // 2. رسم خطوط الكنتور
-    let interval = parseFloat(document.getElementById('contourInterval').value) || 1.0;
-    for (let cZ = Math.floor(minZ); cZ <= Math.ceil(maxZ); cZ += interval) {
-        for (let i = 0; i < points.length - 1; i++) {
-            let p1 = points[i], p2 = points[i+1];
-            if ((p1.z <= cZ && p2.z >= cZ) || (p1.z >= cZ && p2.z <= cZ)) {
-                let ratio = (cZ - p1.z) / (p2.z - p1.z || 1);
-                let cE = p1.e + ratio * (p2.e - p1.e);
-                let cN = p1.n + ratio * (p2.n - p1.n);
-                d.drawPoint(cE, cN, cZ, 'CONTOUR_LINES');
-            }
-        }
-    }
-
-    // 3. رسم جدول التفاصيل والكميات باللوحة
+    // جدول التفاصيل والكميات
     let tX = maxE + 5, tY = maxN;
-    d.drawText(tX, tY, 1.0, 0, "--- SURVEYQUANT SUMMARY TABLE ---", 'QUANTITIES_TABLE');
-    d.drawText(tX, tY - 2, 0.7, 0, `Total Points: ${points.length}`, 'QUANTITIES_TABLE');
-    d.drawText(tX, tY - 4, 0.7, 0, `Max Level (Pt ${maxPt.id}): ${maxPt.z.toFixed(3)} m`, 'QUANTITIES_TABLE');
+    let addText = (x, y, txt, size=0.7) => {
+        dxf.push(`0\nTEXT\n8\nQUANTITIES_TABLE\n10\n${x}\n20\n${y}\n30\n0\n40\n${size}\n1\n${txt}`);
+    };
+
+    addText(tX, tY, "--- SURVEYQUANT SUMMARY TABLE ---", 1.0);
+    addText(tX, tY - 2, `Total Points: ${points.length}`);
+    addText(tX, tY - 4, `Max Level (Pt ${maxPt.id}): ${maxPt.z.toFixed(3)} m`);
     
     min3.forEach((p, idx) => {
-        d.drawText(tX, tY - 6 - (idx * 2), 0.6, 0, `Min Level ${idx+1} (Pt ${p.id}): ${p.z.toFixed(3)} m`, 'QUANTITIES_TABLE');
+        addText(tX, tY - 6 - (idx * 2), `Min Level ${idx+1} (Pt ${p.id}): ${p.z.toFixed(3)} m`, 0.6);
     });
 
     let offset = 6 + (min3.length * 2);
-    d.drawText(tX, tY - offset, 0.7, 0, `Design Level: ${targetZ.toFixed(3)} m`, 'QUANTITIES_TABLE');
-    d.drawText(tX, tY - offset - 2, 0.8, 0, `CUT VOLUME: ${totalCut.toFixed(2)} m3`, 'QUANTITIES_TABLE');
-    d.drawText(tX, tY - offset - 4, 0.8, 0, `FILL VOLUME: ${totalFill.toFixed(2)} m3`, 'QUANTITIES_TABLE');
+    addText(tX, tY - offset, `Design Level: ${targetZ.toFixed(3)} m`);
+    addText(tX, tY - offset - 2, `CUT VOLUME: ${totalCut.toFixed(2)} m3`, 0.8);
+    addText(tX, tY - offset - 4, `FILL VOLUME: ${totalFill.toFixed(2)} m3`, 0.8);
 
-    const dxfString = d.toDxfString();
-    const blob = new Blob([dxfString], { type: 'application/dxf' });
-    const downloadBtn = document.getElementById('downloadBtn');
-    downloadBtn.href = URL.createObjectURL(blob);
+    dxf.push("0\nENDSEC\n0\nEOF");
+    generatedDXFString = dxf.join("\n");
+}
+
+function downloadDXFFile() {
+    if (!generatedDXFString) {
+        alert("يرجى معالجة البيانات أولاً!");
+        return;
+    }
+    const blob = new Blob([generatedDXFString], { type: 'application/dxf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Survey_Contour_Quantities.dxf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 </script>
 
