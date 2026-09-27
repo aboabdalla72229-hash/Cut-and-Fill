@@ -102,13 +102,13 @@
             <p id="levelInfo" style="font-weight: bold; font-size: 15px;"></p>
             <p id="cutVolume" style="color: var(--accent-red); font-size: 18px; font-weight: bold;"></p>
             <p id="fillVolume" style="color: var(--accent-green); font-size: 18px; font-weight: bold;"></p>
-            <button type="button" class="btn-green" onclick="downloadQuantDXF()">💾 تحميل لوحة DXF متوافقة</button>
+            <button type="button" class="btn-green" onclick="downloadQuantDXF()">💾 تحميل لوحة DXF للاوتوكاد</button>
         </div>
     </div>
 
     <!-- SECTION 2: توليد مناسيب كل متر على لوحة DXF -->
     <div class="card">
-        <h3>🗺️ 2. إنشاء مناسيب كل 1 متر تلقائيًا على لوحة DXF / DWG</h3>
+        <h3>🗺️ 2. إنشاء مناسيب كل 1 متر تلقائيًا على لوحة DXF (يدعم Line & Polyline)</h3>
         <div class="grid-2">
             <div>
                 <label>اختر ملف اللوحة (DXF):</label>
@@ -119,7 +119,7 @@
                 <input type="text" id="targetLayer" value="ELEVATIONS_EVERY_1M">
             </div>
         </div>
-        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب وتحميل لوحة DXF المعتمدة</button>
+        <button type="button" class="btn-orange" onclick="generateLevelsOnDXF()">توليد المناسيب وتحميل اللوحة المعدلة</button>
     </div>
 
     <!-- SECTION 3: حساب ميول الطريق -->
@@ -196,69 +196,7 @@ function toggleLevelInput() {
 }
 
 function buildValidDXF(entitiesContent) {
-    return `0
-SECTION
-2
-HEADER
-9
-$ACADVER
-1
-AC1015
-0
-ENDSEC
-0
-SECTION
-2
-TABLES
-0
-TABLE
-2
-LTYPE
-70
-1
-0
-LTYPE
-2
-CONTINUOUS
-70
-0
-3
-Solid line
-72
-65
-63
-0
-0
-ENDTAB
-0
-TABLE
-2
-LAYER
-70
-1
-0
-LAYER
-2
-0
-70
-0
-62
-7
-6
-CONTINUOUS
-0
-ENDTAB
-0
-ENDSEC
-0
-SECTION
-2
-ENTITIES
-${entitiesContent}
-0
-ENDSEC
-0
-EOF`;
+    return `0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n63\n0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entitiesContent}\n0\nENDSEC\n0\nEOF`;
 }
 
 function safeDownloadFile(content, filename, mimeType) {
@@ -348,26 +286,15 @@ function calculateQuantitiesAndDXF() {
         entities.push(`0\nTEXT\n8\nNGL_POINTS\n10\n${p.e + 0.2}\n20\n${p.n + 0.2}\n30\n${p.z}\n40\n0.3\n1\nZ:${p.z.toFixed(2)}`);
     }
 
-    let tX = maxE + 5, tY = maxN;
-    let addText = (x, y, txt, size=0.7) => entities.push(`0\nTEXT\n8\nQUANTITIES_TABLE\n10\n${x}\n20\n${y}\n30\n0\n40\n${size}\n1\n${txt}`);
-    addText(tX, tY, "--- SURVEYQUANT SUMMARY TABLE ---", 1.0);
-    addText(tX, tY - 2, `Total Points: ${points.length}`);
-    addText(tX, tY - 4, `Max Level (Pt ${maxPt.id}): ${maxPt.z.toFixed(3)} m`);
-    min3.forEach((p, idx) => addText(tX, tY - 6 - (idx * 2), `Min Level ${idx+1} (Pt ${p.id}): ${p.z.toFixed(3)} m`, 0.6));
-    let offset = 6 + (min3.length * 2);
-    addText(tX, tY - offset, `Design Level: ${targetZ.toFixed(3)} m`);
-    addText(tX, tY - offset - 2, `CUT VOLUME: ${totalCut.toFixed(2)} m3`, 0.8);
-    addText(tX, tY - offset - 4, `FILL VOLUME: ${totalFill.toFixed(2)} m3`, 0.8);
-
     generatedQuantDXF = buildValidDXF(entities.join("\n"));
 }
 
 function downloadQuantDXF() {
     if (!generatedQuantDXF) return;
-    safeDownloadFile(generatedQuantDXF, "Survey_Contour_Quantities.dxf", "application/dxf");
+    safeDownloadFile(generatedQuantDXF, "Survey_Quantities.dxf", "application/dxf");
 }
 
-// --- 2. توليد المناسيب على اللوحة ---
+// --- 2. توليد المناسيب على اللوحة (يدعم LINE و POLYLINE) ---
 function generateLevelsOnDXF() {
     let fileInput = document.getElementById('dxfFileInput');
     let layer = document.getElementById('targetLayer').value || "ELEVATIONS_EVERY_1M";
@@ -376,44 +303,112 @@ function generateLevelsOnDXF() {
     let reader = new FileReader();
     reader.onload = function(e) {
         let content = e.target.result;
-        let lines = content.split('\n');
+        let normalizedContent = content.replace(/\r\n/g, '\n');
+        let lines = normalizedContent.split('\n');
         let newEntities = [];
+        let subSegments = [];
 
         for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim() === "LINE") {
-                let x1=0, y1=0, z1=0, x2=0, y2=0, z2=0;
-                for (let j = i; j < i + 30 && j < lines.length; j++) {
+            let tag = lines[i].trim();
+
+            // 1. التعامل مع LINE العادية
+            if (tag === "LINE") {
+                let x1 = null, y1 = null, z1 = 0, x2 = null, y2 = null, z2 = 0;
+                for (let j = i + 1; j < i + 30 && j < lines.length; j++) {
                     let code = lines[j].trim();
+                    if (code === "0") break;
                     if (code === "10") x1 = parseFloat(lines[j+1]);
                     if (code === "20") y1 = parseFloat(lines[j+1]);
-                    if (code === "30") z1 = parseFloat(lines[j+1]);
+                    if (code === "30") z1 = parseFloat(lines[j+1]) || 0;
                     if (code === "11") x2 = parseFloat(lines[j+1]);
                     if (code === "21") y2 = parseFloat(lines[j+1]);
-                    if (code === "31") z2 = parseFloat(lines[j+1]);
+                    if (code === "31") z2 = parseFloat(lines[j+1]) || 0;
                 }
-                let len = Math.hypot(x2 - x1, y2 - y1);
-                if (len > 0) {
-                    for (let dist = 0; dist <= len; dist += 1.0) {
-                        let ratio = dist / len;
-                        let px = x1 + ratio * (x2 - x1);
-                        let py = y1 + ratio * (y2 - y1);
-                        let pz = z1 + ratio * (z2 - z1);
-                        newEntities.push(`0\nPOINT\n8\n${layer}\n10\n${px}\n20\n${py}\n30\n${pz}`);
-                        newEntities.push(`0\nTEXT\n8\n${layer}\n10\n${px+0.1}\n20\n${py+0.1}\n30\n${pz}\n40\n0.25\n1\n${pz.toFixed(2)}`);
+                if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+                    subSegments.push({x1, y1, z1, x2, y2, z2});
+                }
+            }
+
+            // 2. التعامل مع POLYLINE / LWPOLYLINE المتصلة
+            else if (tag === "POLYLINE" || tag === "LWPOLYLINE") {
+                let polyPoints = [];
+                let curX = null, curY = null, curZ = 0;
+                let j = i + 1;
+                
+                while (j < lines.length) {
+                    let code = lines[j].trim();
+                    if (code === "0") {
+                        let nextVal = lines[j+1] ? lines[j+1].trim() : "";
+                        if (nextVal === "SEQEND" || nextVal === "POLYLINE" || nextVal === "LWPOLYLINE" || nextVal === "LINE") break;
                     }
+                    if (code === "10") curX = parseFloat(lines[j+1]);
+                    if (code === "20") curY = parseFloat(lines[j+1]);
+                    if (code === "30") curZ = parseFloat(lines[j+1]) || 0;
+                    
+                    // عند اكتمال النقطة (X و Y)
+                    if (code === "20" || code === "10") {
+                        // إذا توافرت الإحداثيات نثبتها
+                        if (curX !== null && curY !== null) {
+                            // تجنب تكرار نفس الإحداثي المتتالي
+                            if (polyPoints.length === 0 || polyPoints[polyPoints.length-1].x !== curX || polyPoints[polyPoints.length-1].y !== curY) {
+                                polyPoints.push({x: curX, y: curY, z: curZ});
+                            }
+                        }
+                    }
+                    j++;
+                }
+
+                // ربط نقاط البولي لاين ببعضها كشرائح خطوط منفصلة
+                for (let pIdx = 0; pIdx < polyPoints.length - 1; pIdx++) {
+                    let ptA = polyPoints[pIdx];
+                    let ptB = polyPoints[pIdx + 1];
+                    subSegments.push({
+                        x1: ptA.x, y1: ptA.y, z1: ptA.z,
+                        x2: ptB.x, y2: ptB.y, z2: ptB.z
+                    });
+                }
+            }
+        }
+
+        // توزيع مسافات المتر الواحد على كل الشرائح المستخرجة
+        for (let seg of subSegments) {
+            let len = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
+            if (len > 0) {
+                for (let dist = 0; dist <= len; dist += 1.0) {
+                    let ratio = dist / len;
+                    let px = seg.x1 + ratio * (seg.x2 - seg.x1);
+                    let py = seg.y1 + ratio * (seg.y1 ? (seg.y2 - seg.y1) : 0); // تم التصحيح الدقيق
+                    // الحساب الأدق للإحداثيات:
+                    px = seg.x1 + ratio * (seg.x2 - seg.x1);
+                    py = seg.y1 + ratio * (seg.y2 - seg.y1);
+                    let pz = seg.z1 + ratio * (seg.z2 - seg.z1);
+
+                    newEntities.push(`0\nPOINT\n8\n${layer}\n10\n${px}\n20\n${py}\n30\n${pz}`);
+                    newEntities.push(`0\nTEXT\n8\n${layer}\n10\n${px+0.1}\n20\n${py+0.1}\n30\n${pz}\n40\n0.25\n1\n${pz.toFixed(2)}`);
                 }
             }
         }
 
         if (newEntities.length === 0) {
-            for (let k = 0; k <= 10; k++) {
-                newEntities.push(`0\nPOINT\n8\n${layer}\n10\n${k}\n20\n${k}\n30\n${100+k}`);
-                newEntities.push(`0\nTEXT\n8\n${layer}\n10\n${k+0.1}\n20\n${k+0.1}\n30\n${100+k}\n40\n0.25\n1\nZ:${(100+k).toFixed(2)}`);
-            }
+            alert("لم يتم العثور على خطوط (LINE أو POLYLINE) صالحة في اللوحة المرفوعة!");
+            return;
         }
 
-        let fullDXF = buildValidDXF(newEntities.join("\n"));
-        safeDownloadFile(fullDXF, "Drawing_With_1M_Levels.dxf", "application/dxf");
+        let entitiesIdx = normalizedContent.indexOf("\n2\nENTITIES");
+        if (entitiesIdx === -1) {
+            alert("عذراً، لم يتم العثور على قسم الكيانات (ENTITIES) في الملف.");
+            return;
+        }
+
+        let endSecIdx = normalizedContent.indexOf("\n0\nENDSEC", entitiesIdx);
+        if (endSecIdx === -1) {
+            alert("ملف DXF غير مكتمل.");
+            return;
+        }
+
+        let updatedContent = normalizedContent.substring(0, endSecIdx) + "\n" + newEntities.join("\n") + normalizedContent.substring(endSecIdx);
+
+        safeDownloadFile(updatedContent, "Modified_Drawing_1M.dxf", "application/dxf");
     };
     reader.readAsText(fileInput.files[0]);
 }
@@ -453,7 +448,9 @@ function calculatePipe() {
     let hi = parseFloat(document.getElementById('pipeHI').value);
     let len = parseInt(document.getElementById('pipeLength').value);
     let startInv = parseFloat(document.getElementById('pipeStartInv').value);
-    let endInv = parseFloat(document.getElementById('pipeEndInv').value);
+    let endInv = parseFloat(document.getElementById('pipeEndInv5') ? document.getElementById('pipeEndInv5').value : document.getElementById('pipeEndInv').value);
+    // تصحيح مرجعي بسيط لقراءة الحقول:
+    endInv = parseFloat(document.getElementById('pipeEndInv').value);
     let dia = parseFloat(document.getElementById('pipeDia').value) || 0;
 
     if (isNaN(len) || isNaN(startInv) || isNaN(endInv)) { alert("يرجى إدخال بيانات الماسورة بشكل صحيح!"); return; }
