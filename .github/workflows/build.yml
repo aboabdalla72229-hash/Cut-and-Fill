@@ -19,27 +19,19 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
     - name: Extract ZIP File
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
-    - name: Fix Permissions and Find Project
+    - name: Build APK with System Gradle
       run: |
-        find app_src -name "gradlew" -exec chmod +x {} \;
-
-    - name: Build APK
-      run: |
-        GRADLEW_PATH=$(find app_src -name "gradlew" | head -n 1)
-        if [ -n "$GRADLEW_PATH" ]; then
-          CD_DIR=$(dirname "$GRADLEW_PATH")
-          cd "$CD_DIR"
-          ./gradlew assembleDebug -Pandroid.defaults.buildfeatures.buildconfig=true --no-daemon
-        else
-          BUILD_FILE=$(find app_src -name "build.gradle" | head -n 1)
-          CD_DIR=$(dirname "$BUILD_FILE")
-          cd "$CD_DIR"
-          gradle assembleDebug -Pandroid.defaults.buildfeatures.buildconfig=true --no-daemon
-        fi
+        BUILD_FILE=$(find app_src -name "build.gradle" | head -n 1)
+        PROJECT_DIR=$(dirname "$BUILD_FILE")
+        cd "$PROJECT_DIR"
+        gradle assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
