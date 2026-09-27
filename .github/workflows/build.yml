@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Unzip project
+      run: |
+        unzip SurveyQuant_AIDE_*.zip -d extracted_project
+        cd extracted_project
+        chmod +x gradlew || true
+
+    - name: Build APK with Gradle
+      run: |
+        cd extracted_project
+        ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: SurveyQuant-App
+        path: extracted_project/app/build/outputs/apk/debug/app-debug.apk
