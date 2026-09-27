@@ -22,11 +22,16 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Extract ZIP
+    - name: Extract ZIP File
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
-    - name: Build APK
+    - name: Inject Namespace
+      run: |
+        APP_GRADLE=$(find app_src -name "build.gradle" | grep "app" | head -n 1)
+        sed -i 's/android {/android {\n    namespace "com.surveyquant.app"/' "$APP_GRADLE"
+
+    - name: Build Debug APK
       run: |
         PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
         cd "$PROJ_DIR"
