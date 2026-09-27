@@ -23,15 +23,16 @@ jobs:
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
 
-    - name: Build APK with Gradle 7.0.2
+    - name: Build APK using Android Command Line Tools
       run: |
         PROJ_DIR=$(dirname $(find app_src -name "settings.gradle" | head -n 1))
         cd "$PROJ_DIR"
         
-        # Install clean standalone gradle wrapper compatible with non-namespace projects
-        gradle wrapper --gradle-version 7.0.2
-        chmod +x gradlew
-        ./gradlew assembleDebug --no-daemon
+        # Inject namespace safely into build.gradle
+        sed -i '/android {/a \    namespace "com.surveyquant.app"' app/build.gradle
+        
+        # Build Debug APK
+        gradle assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
