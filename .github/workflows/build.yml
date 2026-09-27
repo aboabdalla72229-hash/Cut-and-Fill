@@ -19,9 +19,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
     - name: Extract ZIP File
       run: |
         python3 -c "import zipfile, glob; z = glob.glob('*.zip')[0]; zipfile.ZipFile(z).extractall('app_src')"
